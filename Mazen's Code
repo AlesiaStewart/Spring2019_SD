@@ -1,0 +1,61 @@
+! pip install Seaborn
+import numpy as np
+from numpy.random import randn
+import pandas as pd
+from pandas import Series, DataFrame
+import matplotlib.pyplot as plt
+from matplotlib import rcParams
+import seaborn as sb
+import datetime
+address_UL = '/Users/mazenkhoja/Downloads/indi_UL.csv'
+#unload data for indi 
+address_LD ='/Users/mazenkhoja/Downloads/indi_LD.csv'
+#load data for indi
+UL_Main_Data = pd.read_csv(address_UL)
+UL_Main_Data.columns = ['Pro','UL','Dock','Ship','Pcs','Wgt','ULTrlr','ULDoor','UnloadTS','UnLoadDOW','LoadInterval','Org','UnloadDate','UnloadTime']
+LD_Main_Data = pd.read_csv(address_LD)
+LD_Main_Data.columns = ['Pro','L','Dock','Ship','Pcs','Wgt','LdTrlr','LdDoor','LoadTS','LoadDOW','LoadInterval','Dest','LoadTo','LoadToParent','LoadDate','LoadTime']
+#these are the Load and Unload Data and their columns in the data we got from YRC Freight 
+UL_Data1 = UL_Main_Data.drop(['ULTrlr','UnLoadDOW','Pcs','Wgt','UL','Org','Ship'], axis = 1)
+UL_Data1
+LD_Data1 = LD_Main_Data.drop(['LdTrlr','LoadDOW','Pcs','Wgt','L','Ship' ], axis = 1)
+# this is to drop all the unnecessary columns that we don't need. 
+combined_data = pd.merge(UL_Data1, LD_Data1, on="Pro")
+combined_data
+#since we got seperate load and unload data, this was to find the both data for the same pro(shipment ID)
+x1 = combined_data.UnloadDate 
+x2 = combined_data.LoadDate
+#to specify and look at only the unload and load date columns out of the data
+U_DATE = []
+for i in range(len(x1)):
+    U_DATE.append(x1[i].replace('/','')) 
+    U_DATE[i] = U_DATE[i].replace(',','')
+    U_DATE[i] = U_DATE[i].replace('2018','')
+#this was to remove ',','/','2018' from the data so it's easier to analyze the data. #2018 wasn't necessary because all data were taken from 2018 so it wouldn't make a difference  
+    if 3==len(U_DATE[i]):
+        U_DATE[i] = U_DATE[i][0]+U_DATE[i][1] + '0' + U_DATE[i][2]
+#since some of the data only gave the day as one integer instead of 2, we had to add a zero to make it applicable
+L_DATE = []
+for i in range(len(x1)):
+    L_DATE.append(x2[i].replace('/',''))
+    L_DATE[i] = L_DATE[i].replace('2018','')
+    #this was to remove ',','/','2018' from the data so it's easier to analyze the data. #2018 wasn't necessary because all data were taken from 2018 so it wouldn't make a difference
+    if 3==len(L_DATE[i]):
+        L_DATE[i] = L_DATE[i][0]+L_DATE[i][1] + '0' + L_DATE[i][2]
+#since some of the data only gave the day as one integer instead of 2, we had to add a zero to make it applicable
+  difference = []
+for i in range(len(L_DATE)):
+    difference.append((int(L_DATE[i][2:]) - int(U_DATE[i][2:])))
+difference  
+#this code is stating that to get the days that the shipment stayed at the facility and to that is to subtract load date from unload date
+y1 = combined_data.UnloadTime 
+y2 = combined_data.LoadTime
+#to specify the load time and unload time data so we can get how long the shipment stayed at the facility even by time and date 
+U_Time = []
+for i in range(len(y1)):
+    U_Time.append(y1[i].replace(':',''))
+    # this to drop the symbol so we can make it easier to analyze the data 
+L_Time = []
+for i in range(len(y2)):
+    L_Time.append(y2[i].replace(':',''))
+    #to drop the the symbol to make it easier to analyze the data 
