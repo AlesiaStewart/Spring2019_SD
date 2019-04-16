@@ -1,0 +1,69 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Apr 16 14:29:53 2019
+
+@author: gamboa
+"""
+
+import numpy as np
+from numpy.random import randn
+import pandas as pd
+from pandas import Series, DataFrame
+import matplotlib.pyplot as plt
+from matplotlib import rcParams
+import seaborn as sb
+
+address_UL = 'C:\Users\gamboa\Desktop\IE 396 Senior Design\IND_UL.csv'
+address_LD = 'C:\Users\gamboa\Desktop\IE 396 Senior Design\IND_LD.csv'
+
+# Next couple lines imports the data from the files and names the columns of the dataframe
+UL_Main_Data = pd.read_csv(address_UL)
+UL_Main_Data.columns = ['Pro','UL','Dock','Ship','Pcs','Wgt','ULTrlr','ULDoor','UnloadTS','UnLoadDOW','LoadInterval','Org','UnloadDate','UnloadTime']
+
+LD_Main_Data = pd.read_csv(address_LD)
+LD_Main_Data.columns = ['Pro','L','Dock','Ship','Pcs','Wgt','LdTrlr','LdDoor','LoadTS','LoadDOW','LoadInterval','Dest','LoadTo','LoadToParent','LoadDate','LoadTime']
+
+#The line below deletes the UL and Org column since it is not needed when analyzing UL
+UL_Data1 = UL_Main_Data.drop(['UL','Org'], axis = 1)
+UL_Data1
+
+#Finding Wgt congestion per door per day
+Wgt_cong_UL_data = UL_Data1.drop(['Dock','Ship','Pcs','ULTrlr','UnloadTS','UnLoadDOW','LoadInterval'], axis = 1)
+Wgt_cong_UL_data
+
+#Sort df by date
+Wgt_cong_UL_data.sort_values(by = ['UnloadDate','UnloadTime'], inplace = True)
+Wgt_cong_UL_data = Wgt_cong_UL_data.reset_index(drop = True)
+Wgt_cong_UL_data
+
+i = 0
+#j = 0 #i and j will be used as counters for the if loop
+
+#len(Wgt_cong_UL_data)  #Get the number of rows in the df
+Wgt_cong_ULDate = Wgt_cong_UL_data['UnloadDate'] #Create new df with only dates
+Wgt_cong_ULDate = Wgt_cong_ULDate.drop_duplicates() #remove duplicate dates
+Wgt_cong_ULDate = Wgt_cong_ULDate.reset_index(drop = True)
+#print(Wgt_cong_ULDate)
+
+#Create a new df to add in the total weights
+#col_name_for_TotWgt = ['Total Daily Wgt'] # naming the columns
+#TotWgt_df = pd.DataFrame(columns = col_name_for_TotWgt) #creates the df
+#TotWgt_df
+
+Wgt_Date_UL_df = Wgt_cong_UL_data.filter(['Wgt','ULDoor','UnloadDate'], axis = 1) #create new df using columns from old one
+#print(Wgt_Date_UL_df)
+Wgt_Date_UL_df = Wgt_Date_UL_df[pd.to_numeric(Wgt_Date_UL_df['ULDoor'], errors = 'coerce').notnull()]
+print(Wgt_Date_UL_df)
+
+UL_Wgt_Date_Door_Table = Wgt_Date_UL_df.pivot_table(index = 'UnloadDate', columns = 'ULDoor', aggfunc = sum, margins = True, fill_value = 0)
+UL_Wgt_Date_Door_Table
+
+#x = UL_Wgt_Date_Door_Table.sort_values('UnloadDate', axis = 0, ascending = True)
+
+
+Tot_congUL = UL_Wgt_Date_Door_Table.loc['All']
+Tot_congUL = Tot_congUL.reset_index()
+
+Tot_congUL = Tot_congUL.drop(Tot_congUL.index[len(Tot_congUL)-1])
+plt.figure(figsize = (12,12))
+plt.bar(Tot_congUL.ULDoor,Tot_congUL.All,width = .55)
