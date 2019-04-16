@@ -1,0 +1,144 @@
+import numpy as np
+from numpy.random import randn
+import pandas as pd
+from pandas import Series, DataFrame
+import matplotlib.pyplot as plt
+from matplotlib import rcParams
+import seaborn as sb
+from scipy.optimize import minimize
+from io import StringIO
+
+#Start off by assumning 10ft wide doors with 2 ft inbetween doors
+
+NumOfDoor = 177
+DoorsWide = 11
+DoorWidth = 10
+DoorSpace = 2
+DockWidth = DoorsWide*DoorWidth + DoorSpace*(DoorsWide+1)
+Y = 10 # the space from the door to the lane dedicated for forklift travel
+#print(DockWidth)
+
+AllDoors = range(1, NumOfDoor+1)
+#print(AllDoors)
+
+NumDoorNoWide = (NumOfDoor - (DoorsWide * 2))
+#print(NumDoorNoWide)
+
+Half = NumDoorNoWide / 2
+#print(Half)
+
+SideDoors1 = range(1, DoorsWide + 1)
+#print(SideDoors1)
+SideDoors2 = range(NumOfDoor + 1 - DoorsWide, NumOfDoor + 1)
+#print(SideDoors2)
+SideDoors = SideDoors1 + SideDoors2
+#print(SideDoors)
+
+Doors = [e for e in AllDoors if e not in SideDoors]
+#print(Doors)
+
+OddDoors = [num for num in Doors if num % 2 == 1]
+#print(OddDoors)
+
+EvenDoors = [num for num in Doors if num % 2 == 0]
+#print(EvenDoors)
+
+address_UL = 'C:\Users\gamboa\Desktop\IE 396 Senior Design\IND_UL.csv'
+address_LD = 'C:\Users\gamboa\Desktop\IE 396 Senior Design\IND_LD.csv'
+
+# Next couple lines imports the data from the files and names the columns of the dataframe
+UL_Main_Data = pd.read_csv(address_UL)
+UL_Main_Data.columns = ['Pro','UL','Dock','Ship','Pcs','Wgt','ULTrlr','ULDoor','UnloadTS','UnLoadDOW','LoadInterval','Org','UnloadDate','UnloadTime']
+
+LD_Main_Data = pd.read_csv(address_LD)
+LD_Main_Data.columns = ['Pro','L','Dock','Ship','Pcs','Wgt','LdTrlr','LdDoor','LoadTS','LoadDOW','LoadInterval','Dest','LoadTo','LoadToParent','LoadDate','LoadTime']
+
+ULData = UL_Main_Data[pd.to_numeric(UL_Main_Data['ULDoor'], errors='coerce').notnull()]
+ULDoorAndPro = ULData.drop(['UL','Org','Dock','Ship','Pcs','Wgt','ULTrlr','UnloadTS','UnLoadDOW','LoadInterval','UnloadDate','UnloadTime'], axis = 1)
+#print(ULDoorAndPro)
+
+LDdata = LD_Main_Data[pd.to_numeric(LD_Main_Data['LdDoor'], errors='coerce').notnull()]
+LDdoorAndPro = LDdata.drop(['L','Dock','Ship','Pcs','Wgt','LdTrlr','LoadTS','LoadDOW','LoadInterval','Dest', 'LoadToParent', 'LoadTo', 'LoadDate','LoadTime'], axis = 1)
+#print(LDdoorAndPro)
+
+#LDdoorNum = LD_Main_Data['LdDoor'] # Gets Load door numbers
+#DoorNumFull = pd.concat([ULDoorNum, LDdoorNum]) # Combines both to get full list of doors being used to unload and load
+Df_ULandLD = ULDoorAndPro.Pro.isin(LDdoorAndPro.Pro) # Checks if all the Pros that come in leave at some point
+
+
+ULDoorAndPro['UL_to_LD'] = Df_ULandLD # Add the row of Booleans to the original df
+#print(ULDoorAndPro)
+ULDoorAndPro = ULDoorAndPro.reset_index(drop = True)
+ULDoorAndPro_True = ULDoorAndPro[ULDoorAndPro.UL_to_LD] # Only get the true values
+ULDoorAndPro_True = ULDoorAndPro_True.reset_index(drop = True)
+ULemptyCount = pd.DataFrame(index = ULDoorAndPro.index.values, columns = ['Count']) # Create empty dataframe with index from ULDoorAndPro_True
+ULemptyCount = ULemptyCount.fillna(0)
+
+for a in range(len(ULemptyCount)):
+    if a == 0:
+        ULemptyCount.iloc[a] = 1
+    else:
+        if ULDoorAndPro.loc[a-1,'Pro'] == ULDoorAndPro.loc[a,'Pro']:
+            ULemptyCount.iloc[a] = 1 + ULemptyCount.iloc[a-1]
+        else:
+            ULemptyCount.iloc[a] = 1
+
+#print(ULemptyCount)
+ULDoorAndPro['Count'] = ULemptyCount
+#print(ULDoorAndPro)
+
+Df_LDandUL = LDdoorAndPro.Pro.isin(ULDoorAndPro_True.Pro)
+LDdoorAndPro['LD_to_UL'] = Df_LDandUL
+LDdoorAndPro = LDdoorAndPro.reset_index(drop = True)
+LDdoorAndPro_True = LDdoorAndPro[LDdoorAndPro.LD_to_UL]
+LDdoorAndPro_True = LDdoorAndPro_True.reset_index(drop = True)
+LDemptyCount = pd.DataFrame(index = LDdoorAndPro.index.values, columns = ['Count']) # Create empty dataframe with index from LDdoorAndPro_True
+LDemptyCount = LDemptyCount.fillna(0)
+for a in range(len(LDemptyCount)):
+    if a == 0:
+        LDemptyCount.iloc[a] = 1
+    else:
+        if LDdoorAndPro.loc[a-1,'Pro'] == LDdoorAndPro.loc[a,'Pro']:
+            LDemptyCount.iloc[a] = 1 + LDemptyCount.iloc[a-1]
+        else:
+            LDemptyCount.iloc[a] = 1
+LDdoorAndPro['Count'] = LDemptyCount
+#print(LDemptyCount)
+#print(LDdoorAndPro)
+
+#FromTo_v1 = pd.merge(ULDoorAndPro_True,LDdoorAndPro_True[['Pro','LdDoor']],on = 'Pro', how = 'inner')
+#FromTo = FromTo_v1.drop_duplicates(subset=['Pro','ULDoor','LdDoor'], keep = 'first')
+#ULDoorAndPro_True['LdDoor'] = LDdoorAndPro.LdDoor
+#FromTo = ULDoorAndPro_True
+#FromTo = FromTo.drop(['UL_to_LD'])
+#print(FromTo_v1)
+FromTo = pd.merge(ULDoorAndPro, LDdoorAndPro, on = ['Pro', 'Count']) # Shortcut to above stuff
+#print(FromTo) 
+#FromTo = FromTo.drop(['UL_to_LD', 'Count','LD_to_UL'])
+
+distance = pd.DataFrame(index = FromTo.index.values, columns = ['Distance'])
+distance = distance.fillna(0)
+
+for b in range(len(FromTo)):
+   
+    if FromTo.loc[b,'ULDoor'] in EvenDoors and FromTo.loc[b,'LdDoor'] in EvenDoors:
+        x = abs(EvenDoors.get_loc(FromTo.loc[b,'ULDoors']) - EvenDoors.get_loc(FromTo.loc[b,'LdDoors']))
+        if x < 1:
+           distance.loc[b] = 0
+        else:
+           distance.loc[b] = DoorWidth * x + DoorSpace * x + 2 * Y
+    elif FromTo.loc[b,'ULDoor'] in OddDoors and FromTo.loc[b,'LdDoor'] in OddDoors:
+        x = abs(OddDoors.get_loc(FromTo.loc[b,'ULDoors']) - OddDoors.get_loc(FromTo.loc[b,'LdDoors']))
+        if x < 1:
+           distance.loc[b] = 0
+        else:
+           distance.loc[b] = DoorWidth * x + DoorSpace * x + 2 * Y
+    elif FromTo.loc[b,'ULDoor'] in SideDoors and FromTo.loc[b,'LdDoor'] in SideDoors:
+        distance.loc[b] = None
+    else:
+        x1 = abs(OddDoors.get_loc(FromTo.loc[b,'ULDoors']) - EvenDoors.get_loc(FromTo.loc[b,'LdDoors']))
+        x2 = abs(EvenDoors.get_loc(FromTo.loc[b,'ULDoors']) - OddDoors.get_loc(FromTo.loc[b,'LdDoors']))
+        x = max(x1, x2)
+        distance.loc[b] = DoorWidth * x + DoorSpace * x + 2 * Y + DockWidth
+
+print(distance)
