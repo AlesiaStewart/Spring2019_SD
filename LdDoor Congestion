@@ -1,0 +1,85 @@
+import numpy as np
+from numpy.random import randn
+import pandas as pd
+from pandas import Series, DataFrame
+import matplotlib.pyplot as plt
+from matplotlib import rcParams
+import seaborn as sb
+
+address_UL = 'C:\Users\gamboa\Desktop\IE 396 Senior Design\IND_UL.csv'
+address_LD = 'C:\Users\gamboa\Desktop\IE 396 Senior Design\IND_LD.csv'
+
+# Next couple lines imports the data from the files and names the columns of the dataframe
+UL_Main_Data = pd.read_csv(address_UL)
+UL_Main_Data.columns = ['Pro','UL','Dock','Ship','Pcs','Wgt','ULTrlr','ULDoor','UnloadTS','UnLoadDOW','LoadInterval','Org','UnloadDate','UnloadTime']
+
+LD_Main_Data = pd.read_csv(address_LD)
+LD_Main_Data.columns = ['Pro','L','Dock','Ship','Pcs','Wgt','LdTrlr','LdDoor','LoadTS','LoadDOW','LoadInterval','Dest','LoadTo','LoadToParent','LoadDate','LoadTime']
+
+#The line below deletes the UL and Org column since it is not needed when analyzing UL
+LD_Data1 = LD_Main_Data.drop(['L','Ship','LdTrlr','LoadTS', 'LoadDOW','LoadInterval'], axis = 1)
+LD_Data1
+
+# Below starts the wgt congestion analyis of the data
+Wgt_cong_LD_data = LD_Data1.drop(['Pro','Dock','Pcs','LoadTo','Dest','LoadToParent'], axis = 1)
+Wgt_cong_LD_data
+
+Wgt_cong_LD_data.sort_values(by = ['LoadDate','LoadTime'], inplace = True)
+Wgt_cong_LD_data = Wgt_cong_LD_data.reset_index(drop = True)
+Wgt_cong_LD_data
+
+Wgt_cong_LDDate = Wgt_cong_LD_data['LoadDate']
+Wgt_cong_LDDate = Wgt_cong_LDDate.drop_duplicates()
+Wgt_cong_LDDate = Wgt_cong_LDDate.reset_index(drop = True)
+#print(Wgt_cong_LDDate)
+
+Wgt_Date_LD_df = Wgt_cong_LD_data.filter(['Wgt','LdDoor','LoadDate'], axis = 1)
+
+LD_Wgt_Date_Door_Table = Wgt_Date_LD_df.pivot_table(index = 'LoadDate', columns = 'LdDoor', aggfunc = sum, margins = True, fill_value = 0)
+#print(LD_Wgt_Date_Door_Table)
+#print(LD_Wgt_Date_Door_Table.columns)
+Tot_cong = LD_Wgt_Date_Door_Table.loc['All']
+Tot_cong = Tot_cong.reset_index()
+#print(list(Tot_cong.index.values))
+Tot_cong = Tot_cong.drop(Tot_cong.index[len(Tot_cong)-1])
+#print(Tot_cong)
+#print(Tot_cong.sort_values('All', ascending = False))
+#Tot_cong.plot.bar(x = 'LdDoor', y = 'All', figsize = (12,12), legend = False)
+plt.figure(figsize = (12,12))
+plt.bar(Tot_cong.LdDoor,Tot_cong.All,width = .55)
+NumOfDoor = 177  # These numbers should be brought in from user input 
+DoorsWide = 11
+DoorWidth = 10
+DoorSpace = 2
+DockWidth = DoorsWide*DoorWidth + DoorSpace*(DoorsWide+1)
+Y = 10 # the space from the door to the lane dedicated for forklift travel
+#print(DockWidth)
+
+AllDoors = range(1, NumOfDoor+1)
+#print(AllDoors)
+
+NumDoorNoWide = (NumOfDoor - (DoorsWide * 2))
+#print(NumDoorNoWide)
+
+Half = NumDoorNoWide / 2
+#print(Half)
+
+SideDoors1 = range(1, DoorsWide + 1)
+#print(SideDoors1)
+SideDoors2 = range(NumOfDoor + 1 - DoorsWide, NumOfDoor + 1)
+#print(SideDoors2)
+SideDoors = SideDoors1 + SideDoors2
+#print(SideDoors)
+
+Doors = [e for e in AllDoors if e not in SideDoors]
+#print(Doors)
+
+Odd = [num for num in Doors if num % 2 == 1]
+OddDoors = pd.DataFrame({'LdDoor':Odd})
+#print(OddDoors)
+
+Even = [num for num in Doors if num % 2 == 0]
+EvenDoors = pd.DataFrame({'LdDoor':Even})
+#print(EvenDoors)
+
+#EvenSide = pd.merge(EvenDoors,Tot_cong, on = 'LdDoor')
