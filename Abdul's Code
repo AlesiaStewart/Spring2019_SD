@@ -1,0 +1,40 @@
+! pip install Seaborn
+
+import numpy as np
+from numpy.random import randn
+import pandas as pd
+from pandas import Series, DataFrame
+import matplotlib.pyplot as plt
+from matplotlib import rcParams
+import seaborn as sb
+import datetime
+
+address_UL = '/Users/abdulazizshalaby/Downloads/Esteban324DLOData-324UL.csv'
+#unload data for indi 
+address_LD ='/Users/abdulazizshalaby/Downloads/Esteban324DLOData-324LD.csv'
+#load data for indi
+UL_Main_Data = pd.read_csv(address_UL)
+UL_Main_Data.columns = ['Pro','UL','Dock','Ship','Pcs','Wgt','ULTrlr','ULDoor','UnloadTS','UnLoadDOW','LoadInterval','Org','UnloadDate','UnloadTime']
+LD_Main_Data = pd.read_csv(address_LD)
+LD_Main_Data.columns = ['Pro','L','Dock','Ship','Pcs','Wgt','LdTrlr','LdDoor','LoadTS','LoadDOW','LoadInterval','Dest','LoadTo','LoadToParent','LoadDate','LoadTime']
+LD_Main_Data = pd.read_csv(address_LD)
+combined_data = pd.merge(UL_Main_Data, LD_Main_Data, on="Pro")
+x1 = combined_data.Wgt_x
+x2 = combined_data.Pcs_x
+combined_data['weight_per_piece'] = (x1/x2) 
+combined_data.to_csv('indi_UL.csv')
+h = combined_data.weight_per_piece.mean()
+#506 is the mean for the piece 
+combined_data = combined_data.drop(['ULTrlr','UnLoadDOW','UL','Org','Ship_x', 'Dock_x','LoadTime','LoadDate','Wgt_y','Dest','LoadDOW','Pcs_y','UnloadDate'], axis = 1)
+t = 90 
+table = pd.pivot_table(combined_data, index =["ULDoor"], columns = ["LdDoor"], values = ["Wgt_x"], aggfunc = np.sum, margins = True)
+table = (table.fillna(0))
+table = table.reset_index()
+combined_data
+lambda_j = pd.DataFrame(index = range(1,len(table.columns)) , columns = ['All'])
+lambda_j = lambda_j.fillna(0) 
+for i in range(1,len(table.columns)-1):
+    if not i in [104,106,108,110,'All']:
+        lambda_j.iloc[i] = table.loc[len(table)-1,('Wgt_x', i)]/(12*45*14)
+lambda_j
+#Loading space dimensions are 12 feet in width, 45 feet in length, and with 14 feet of vertical clearance
