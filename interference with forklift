@@ -56,3 +56,17 @@ for i in range(1,226):
 abs(values)
 
 
+
+
+values = pd.DataFrame(index = range(1,len(table)) , columns = ['final'])
+values = values.fillna(0)
+values = 0
+for i in range(1,226):
+    values += ((t*lambda_j.iloc[i]['Weight']*fik.iloc[i]['Sub'])/(u*(u -lambda_j.iloc[i]['Weight'])))
+    #print(lambda_j.iloc[i]*fik.iloc[i])
+    #print(fik.iloc[i])
+    #print(lambda_j.iloc[i],'this si the lambda')
+values
+#the values of the summation is 36450.00910878107
+
+
