@@ -324,11 +324,11 @@ while count2 < 2:
     newpairs2['LdDoor'], newpairs2['LdDoor'] = np.where(newp2 == newpairs2.loc[temp2,'LdDoor'],newpairs2.loc[temp22,'LdDoor'],newp2).tolist(),np.where(newpp2 == newpairs2.loc[temp22,'LdDoor'],newpairs2.loc[temp2,'LdDoor'],newpp2).tolist()
     newpairs3['LdDoor'], newpairs2['LdDoor'] = np.where(newp3 == newpairs3.loc[temp1,'LdDoor'],newpairs3.loc[temp2,'LdDoor'],newp3).tolist(),np.where(newpp3 == newpairs3.loc[temp2,'LdDoor'],newpairs3.loc[temp1,'LdDoor'],newpp3).tolist()
     
-    distance1 = pd.DataFrame(index = StaticFromTo.reset_index(drop = True), columns = ['Distance'])
+    distance1 = pd.DataFrame(index = StaticFromTo.index, columns = ['Distance'])
     distance1 = distance1.fillna(0)
-    distance2 = pd.DataFrame(index = StaticFromTo.reset_index(drop = True), columns = ['Distance'])
+    distance2 = pd.DataFrame(index = StaticFromTo.index, columns = ['Distance'])
     distance2 = distance2.fillna(0)
-    distance3 = pd.DataFrame(index = StaticFromTo.reset_index(drop = True), columns = ['Distance'])
+    distance3 = pd.DataFrame(index = StaticFromTo.index, columns = ['Distance'])
     distance3 = distance3.fillna(0)
     
     for b in range(len(newpairs1)):
