@@ -14,21 +14,22 @@ UL_Main_Data.columns = ['Pro','UL','Dock','Ship','Pcs','Wgt','ULTrlr','ULDoor','
 
 LD_Main_Data = pd.read_csv(address_LD)
 LD_Main_Data.columns = ['Pro','L','Dock','Ship','Pcs','Wgt','LdTrlr','LdDoor','LoadTS','LoadDOW','LoadInterval','Dest','LoadTo','LoadToParent','LoadDate','LoadTime']
-combined_data = pd.merge(UL_Main_Data, LD_Main_Data, on="Pro")
+UL_Main_data = UL_Main_Data.isin(UL_Main_Data)
+combined_data = pd.merge(ULdata, LD_Main_Data, on="Pro")
 x1 = combined_data.Wgt_x
 x2 = combined_data.Pcs_x
 combined_data['weight_per_piece'] = (x1/x2) 
 combined_data.to_csv('indi_UL.csv')
 h = combined_data.weight_per_piece.mean()
 #506 is the mean for the piece 
-combined_data = combined_data.drop(['ULTrlr','UnLoadDOW','UL','Org','Ship_x', 'Dock_x','LoadTime','LoadDate','Wgt_y','Dest','LoadDOW','Pcs_y','UnloadDate'], axis = 1)
+combined_data = combined_data.drop(['ULTrlr','UnLoadDOW','UL','Org','Ship_x', 'Dock_x','LoadTime','LoadDate','Wgt_y','Dest','LoadDOW','Pcs_y','UnloadDate','LoadInterval_y','LoadTS','LdTrlr','Ship_y','Dock_y','LoadInterval_x','UnloadTS','LoadToParent','L', 'UnloadTime'], axis = 1)
 t = 120
 u = 3
+ULdata = UL_Main_Data[pd.to_numeric(UL_Main_Data['ULDoor'], errors = 'ceore').notnull()]
 table = pd.pivot_table(combined_data, index =["ULDoor"], columns = ["LdDoor"], values = ["Wgt_x"], aggfunc = np.sum, margins = True)
 table = (table.fillna(0))
 table = table.reset_index()
-LDdata = LD_Main_Data[pd.to_numeric(LD_Main_Data['LdDoor'], errors = 'ceore').notnull()] 
-ULdata = UL_Main_Data[pd.to_numeric(UL_Main_Data['ULDoor'], errors = 'ceore').notnull()]
+
 
 
 
@@ -36,7 +37,7 @@ ULdata = UL_Main_Data[pd.to_numeric(UL_Main_Data['ULDoor'], errors = 'ceore').no
 lambda_j = pd.DataFrame(index = range(1,len(table)) , columns = ['Weight'])
 lambda_j = lambda_j.fillna(0) 
 for i in range(0,len(table)-1):
-    if not i in [104,106,108,110,'All']:
+    if not i in ['All']:
         lambda_j.iloc[i] = table.loc[i , ('Wgt_x','All')]/(h*t)
         
         
@@ -45,7 +46,7 @@ for i in range(0,len(table)-1):
 fik = pd.DataFrame(index = range(1,len(table)) , columns = ['Sub'])
 fik = fik.fillna(0) 
 for i in range(1,len(table)-1):
-    if not i in [104,106,108,110,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223,224,225,226,'All']:
+    if not i in [104,106,108,110,'All']:
         fik.iloc[i] = 2*table.loc[len(table)-1,('Wgt_x',i)]/(h*t)
         
         
@@ -61,12 +62,13 @@ abs(values)
 values = pd.DataFrame(index = range(1,len(table)) , columns = ['final'])
 values = values.fillna(0)
 values = 0
-for i in range(1,226):
+for i in range(1,173):
     values += ((t*lambda_j.iloc[i]['Weight']*fik.iloc[i]['Sub'])/(u*(u -lambda_j.iloc[i]['Weight'])))
     #print(lambda_j.iloc[i]*fik.iloc[i])
     #print(fik.iloc[i])
     #print(lambda_j.iloc[i],'this si the lambda')
 values
-#the values of the summation is 36450.00910878107
+#the values of the summation is 36245.36086410149
+
 
 
