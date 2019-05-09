@@ -1,0 +1,336 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu May  9 02:15:43 2019
+
+@author: gamboa
+"""
+
+import numpy as np
+import pandas as pd
+
+#Start off by assumning 10ft wide doors with 2 ft inbetween doors
+
+NumOfDoor = 177
+DoorsWide = 11 #Number of Doors
+DoorWidth = 13 #Door width in feet
+DoorSpace = 2
+DockWidth = DoorsWide*DoorWidth + DoorSpace*(DoorsWide+1)
+Y = 10 # the space from the door to the lane dedicated for forklift travel
+
+AllDoors = range(1, NumOfDoor+1)
+
+NumDoorNoWide = (NumOfDoor - (DoorsWide * 2))
+
+Half = NumDoorNoWide / 2
+
+SideDoors1 = range(1, DoorsWide + 1)
+SideDoors2 = range(NumOfDoor + 1 - DoorsWide, NumOfDoor + 1)
+SideDoors = SideDoors1 + SideDoors2
+
+Doors = [e for e in AllDoors if e not in SideDoors]
+
+OddDoors = [num for num in Doors if num % 2 == 1]
+
+EvenDoors = [num for num in Doors if num % 2 == 0]
+
+address_UL = 'C:\Users\gamboa\Desktop\IE 396 Senior Design\IND_UL.csv'
+address_LD = 'C:\Users\gamboa\Desktop\IE 396 Senior Design\IND_LD.csv'
+
+# Next couple lines imports the data from the files and names the columns of the dataframe
+UL_Main_Data = pd.read_csv(address_UL)
+UL_Main_Data.columns = ['Pro','UL','Dock','Ship','Pcs','Wgt','ULTrlr','ULDoor','UnloadTS','UnLoadDOW','LoadInterval','Org']
+
+LD_Main_Data = pd.read_csv(address_LD)
+LD_Main_Data.columns = ['Pro','L','Dock','Ship','Pcs','Wgt','LdTrlr','LdDoor','LoadTS','LoadDOW','LoadInterval','Dest','LoadTo','LoadToParent']
+
+ULData = UL_Main_Data[pd.to_numeric(UL_Main_Data['ULDoor'], errors='coerce').notnull()]
+ULDoorAndPro = ULData.drop(['UL','Org','Dock','Ship','ULTrlr','UnloadTS','UnLoadDOW','LoadInterval'], axis = 1)
+
+
+LDdata = LD_Main_Data[pd.to_numeric(LD_Main_Data['LdDoor'], errors='coerce').notnull()]
+LDdoorAndPro = LDdata.drop(['L','Dock','Ship','LdTrlr','LoadTS','LoadDOW','LoadInterval','Dest', 'LoadToParent'], axis = 1)
+
+Df_ULandLD = ULDoorAndPro.Pro.isin(LDdoorAndPro.Pro) # Checks if all the Pros that come in leave at some point
+
+
+ULDoorAndPro['UL_to_LD'] = Df_ULandLD # Add the row of Booleans to the original df
+ULDoorAndPro = ULDoorAndPro.reset_index(drop = True)
+ULDoorAndPro_True = ULDoorAndPro[ULDoorAndPro.UL_to_LD] # Only get the true values
+ULDoorAndPro_True = ULDoorAndPro_True.reset_index(drop = True)
+ULemptyCount = pd.DataFrame(index = ULDoorAndPro.index.values, columns = ['Count']) # Create empty dataframe with index from ULDoorAndPro_True
+ULemptyCount = ULemptyCount.fillna(0)
+
+for a in range(len(ULemptyCount)):
+    if a == 0:
+        ULemptyCount.iloc[a] = 1
+    else:
+        if ULDoorAndPro.loc[a-1,'Pro'] == ULDoorAndPro.loc[a,'Pro']:
+            ULemptyCount.iloc[a] = 1 + ULemptyCount.iloc[a-1]
+        else:
+            ULemptyCount.iloc[a] = 1
+
+ULDoorAndPro['Count'] = ULemptyCount
+
+Df_LDandUL = LDdoorAndPro.Pro.isin(ULDoorAndPro_True.Pro)
+LDdoorAndPro['LD_to_UL'] = Df_LDandUL
+LDdoorAndPro = LDdoorAndPro.reset_index(drop = True)
+LDdoorAndPro_True = LDdoorAndPro[LDdoorAndPro.LD_to_UL]
+LDdoorAndPro_True = LDdoorAndPro_True.reset_index(drop = True)
+LDemptyCount = pd.DataFrame(index = LDdoorAndPro.index.values, columns = ['Count']) # Create empty dataframe with index from LDdoorAndPro_True
+LDemptyCount = LDemptyCount.fillna(0)
+for a in range(len(LDemptyCount)):
+    if a == 0:
+        LDemptyCount.iloc[a] = 1
+    else:
+        if LDdoorAndPro.loc[a-1,'Pro'] == LDdoorAndPro.loc[a,'Pro']:
+            LDemptyCount.iloc[a] = 1 + LDemptyCount.iloc[a-1]
+        else:
+            LDemptyCount.iloc[a] = 1
+LDdoorAndPro['Count'] = LDemptyCount
+
+FromTo = pd.merge(ULDoorAndPro, LDdoorAndPro, on = ['Pro', 'Count']) # Shortcut to above stuff
+
+distance = pd.DataFrame(index = FromTo.index.values, columns = ['Distance'])
+distance = distance.fillna(0)
+
+for b in range(len(FromTo)):
+    if int(FromTo.loc[b,'ULDoor']) in EvenDoors and int(FromTo.loc[b,'LdDoor']) in EvenDoors:
+        x = abs(EvenDoors.index(int(FromTo.loc[b,'ULDoor'])) - EvenDoors.index(int(FromTo.loc[b,'LdDoor'])))
+        if x < 1:
+           distance.loc[b] = 0
+        else:
+           distance.loc[b] = DoorWidth * x + DoorSpace * x + 2 * Y
+    elif int(FromTo.loc[b,'ULDoor']) in OddDoors and int(FromTo.loc[b,'LdDoor']) in OddDoors:
+        x = abs(OddDoors.index(int(FromTo.loc[b,'ULDoor'])) - OddDoors.index(int(FromTo.loc[b,'LdDoor'])))
+        if x < 1:
+           distance.loc[b] = 0
+        else:
+           distance.loc[b] = DoorWidth * x + DoorSpace * x + 2 * Y
+    elif int(FromTo.loc[b,'ULDoor']) in SideDoors and int(FromTo.loc[b,'LdDoor']) in SideDoors:
+        distance.loc[b] = None
+    else:
+        if int(FromTo.loc[b,'ULDoor']) in OddDoors and int(FromTo.loc[b,'LdDoor']) in EvenDoors:
+            x = abs(OddDoors.index(int(FromTo.loc[b,'ULDoor'])) - EvenDoors.index(int(FromTo.loc[b,'LdDoor'])))
+            distance.loc[b] = DoorWidth * x + DoorSpace * x + DockWidth
+        elif int(FromTo.loc[b,'ULDoor']) in EvenDoors and int(FromTo.loc[b,'LdDoor']) in OddDoors:
+            x = abs(EvenDoors.index(int(FromTo.loc[b,'ULDoor'])) - OddDoors.index(int(FromTo.loc[b,'LdDoor'])))
+            distance.loc[b] = DoorWidth * (x+1) + DoorSpace * (x+1) + DockWidth
+        
+        
+
+FromTo['Distance'] = distance * 2
+speed = 26400 # Avg speed of a forklift
+
+WgtPerPiece = FromTo['Wgt_y']/FromTo['Pcs_y']
+h = WgtPerPiece.mean()
+FromTo['c_ij'] = FromTo['Distance'] / (h*speed)# Cost in man hours to move a pound of freight from door i to door j 
+FromTo = FromTo.dropna()
+#FromTo now contains c_ij and f_ij. To get sum_i (sum_j(c_ij*f_ij)), add up the columns fo these sections
+labor_cost_travel_df = FromTo['c_ij'] * FromTo['Wgt_y']
+
+labor_cost_travel = labor_cost_travel_df.sum()
+
+Unload = FromTo.ULDoor
+Ul = Unload
+Ul = Ul.to_frame()
+Ul.columns = ['LdDoor']
+Ul.LdDoor = pd.to_numeric(Ul.LdDoor, errors = 'coerce')
+Load = FromTo.LdDoor
+Ld = Load
+Ld = Ld.to_frame()
+Ld.columns = ['LdDoor']
+LdUL = Ul.merge(Ld, how = 'outer', on = 'LdDoor') # outer merge to get all doors used
+LdUL = LdUL.drop_duplicates()
+LdUL = LdUL.reset_index() #LdUL will be used to count how many times the number shows up in unload and load columns of FromTo
+FromToCountsUL = FromTo['ULDoor'].value_counts() # Index becomes door number and column becomes count
+FromToCountsUL = FromToCountsUL.to_frame()
+FromToCountsUL.index = FromToCountsUL.index.astype(int)
+FromToCountsUL.columns = ['Count']
+FromTo2 = FromToCountsUL[(FromToCountsUL.index.isin(LdUL.LdDoor))] # Checks what doors from ULDoor in FromTo show up in both ULDoor and LdDoor in FromTo. Has the count too
+FromTo2.index = FromTo2.index.astype(int)
+FromToCountsLD = FromTo['LdDoor'].value_counts()
+FromToCountsLD = FromToCountsLD.to_frame()
+FromToCountsLD.columns = ['Count']
+FromTo3 = FromToCountsLD[(FromToCountsLD.index.isin(LdUL.LdDoor))]
+FromTo3.index = FromTo3.index.astype(int)
+mergedFromTo = pd.merge(FromTo2, FromTo3, left_index = True, right_index = True)
+ULdelete = pd.DataFrame(columns = ['Count'])
+LDdelete = pd.DataFrame(columns = ['Count'])
+    
+for count1 in FromTo3.index:
+    if mergedFromTo.loc[count1, 'Count_x'] < mergedFromTo.loc[count1, 'Count_y']:
+        ULdelete.loc[count1] = mergedFromTo.loc[count1, 'Count_x']
+    elif mergedFromTo.loc[count1, 'Count_x'] > mergedFromTo.loc[count1, 'Count_y']:
+        LDdelete.loc[count1] = mergedFromTo.loc[count1, 'Count_y']
+    else:
+        LDdelete.loc[count1] = mergedFromTo.loc[count1, 'Count_y']
+            
+        #Use LDdelete and ULdelete to remove values from FromTo table to make StaticFromTo
+StaticFromTo = FromTo[(~FromTo.LdDoor.isin(LDdelete.index))]
+StaticFromTo = StaticFromTo.reset_index(drop = True)
+StackDoor = FromTo3[(~FromTo3.index.isin(LDdelete.index))].index 
+pairs = StaticFromTo.filter(['Pro','ULDoor', 'LdDoor', 'LoadTo','Wgt_y'], axis = 1)
+newpairs1 = pairs.copy()
+newpairs2 = pairs.copy()
+newpairs3 = pairs.copy()
+StackDoordf = pd.DataFrame(StackDoor)
+StackDoordf.columns = ['LdDoor']
+Strip = pd.DataFrame(FromTo3.index)
+StripDoor = Strip[(FromTo3.index.isin(LDdelete.index))].index
+StripDoor2 = StripDoor[()]
+StripDoordf =  pd.DataFrame(StripDoor)
+StripDoordf.columns = ['ULDoor']
+count2 = 0
+while count2 < 50:
+    import random
+    # The 1 are for strip switching with strip, 2 stack with stack, 3 strip with stack
+    
+    temp1 = StackDoordf.loc[random.randint(0,len(StackDoordf)),'LdDoor']
+    temp11 = StackDoordf.loc[random.randint(0,len(StackDoordf)),'LdDoor']
+    temp2 = StripDoordf.loc[random.randint(0,len(StripDoordf)),'ULDoor']
+    temp22 = StripDoordf.loc[random.randint(0,len(StripDoordf)),'ULDoor']
+    
+    newpairs1.ULDoor = pd.to_numeric(newpairs1.ULDoor, errors = 'coerce')
+    newpairs2.ULDoor = pd.to_numeric(newpairs2.ULDoor, errors = 'coerce')
+    newpairs3.ULDoor = pd.to_numeric(newpairs3.ULDoor, errors = 'coerce')
+    
+    TempPairs1 = newpairs1.copy() # the TempPairs will be used to restore newpairs to original df before this iteration's swap
+    TempPairs2 = newpairs2.copy()
+    TempPairs3 = newpairs3.copy()
+    
+    newpairs1['LdDoor'] = newpairs1['LdDoor'].where(newpairs1['LdDoor'] != temp1, temp11*1e5)
+    newpairs1['LdDoor'] = newpairs1['LdDoor'].where(newpairs1['LdDoor'] != temp11, temp1)
+    newpairs1.loc[newpairs1.LdDoor == temp11*1e5, 'LdDoor'] = int((temp11*1e5)/(1e5))
+    newpairs2['ULDoor'] = newpairs2['ULDoor'].where(newpairs2['ULDoor'] != temp2, temp22*1e5)
+    newpairs2['ULDoor'] = newpairs2['ULDoor'].where(newpairs2['ULDoor'] != temp22, temp2)
+    newpairs2.loc[newpairs2.LdDoor == temp22*1e5, 'ULDoor'] = int((temp22*1e5)/(1e5))
+    newpairs3['LdDoor'] = newpairs3['LdDoor'].where(newpairs3['LdDoor'] != temp1, temp2)
+    newpairs3['ULDoor'] = newpairs3['ULDoor'].where(newpairs3['ULDoor'] != temp2, temp1)
+    #newpairs3.loc[newpairs3.LdDoor == temp2*1e5, 'LdDoor'] = int((temp2*1e5)/(1e5))
+     
+    distance1 = pd.DataFrame(index = StaticFromTo.index, columns = ['Distance'])
+    distance1 = distance1.fillna(0)
+    distance2 = pd.DataFrame(index = StaticFromTo.index, columns = ['Distance'])
+    distance2 = distance2.fillna(0)
+    distance3 = pd.DataFrame(index = StaticFromTo.index, columns = ['Distance'])
+    distance3 = distance3.fillna(0)
+    
+    
+    newpairs1 = newpairs1.reset_index(drop = True)
+    f = 0
+    for f in range(len(newpairs1)):
+        if int(newpairs1.loc[f,'ULDoor']) in EvenDoors and int(newpairs1.loc[f,'LdDoor']) in EvenDoors:
+            x = abs(EvenDoors.index(int(newpairs1.loc[f,'ULDoor'])) - EvenDoors.index(int(newpairs1.loc[f,'LdDoor'])))
+            if x < 1:
+                distance1.loc[f] = 0
+            else:
+               distance1.loc[f] = DoorWidth * x + DoorSpace * x + 2 * Y
+        elif int(newpairs1.loc[f,'ULDoor']) in OddDoors and int(newpairs1.loc[f,'LdDoor']) in OddDoors:
+            x = abs(OddDoors.index(int(newpairs1.loc[f,'ULDoor'])) - OddDoors.index(int(newpairs1.loc[f,'LdDoor'])))
+            if x < 1:
+                distance1.loc[f] = 0
+            else:
+                distance1.loc[f] = DoorWidth * x + DoorSpace * x + 2 * Y
+        elif int(newpairs1.loc[f,'ULDoor']) in SideDoors and int(newpairs1.loc[f,'LdDoor']) in SideDoors:
+            distance1.loc[f] = None
+        elif int(newpairs1.loc[f,'ULDoor']) in OddDoors and int(newpairs1.loc[f,'LdDoor']) in EvenDoors:
+            x = abs(OddDoors.index(int(newpairs1.loc[f,'ULDoor'])) - EvenDoors.index(int(newpairs1.loc[f,'LdDoor'])))
+            distance1.loc[f] = DoorWidth * (x + 1) + DoorSpace * (x + 1) + DockWidth
+        elif int(newpairs1.loc[f,'ULDoor']) in EvenDoors and int(newpairs1.loc[f,'LdDoor']) in OddDoors:
+            x = abs(EvenDoors.index(int(newpairs1.loc[f,'ULDoor'])) - OddDoors.index(int(newpairs1.loc[f,'LdDoor'])))
+            distance1.loc[f] = DoorWidth * (x + 1) + DoorSpace * (x + 1) + DockWidth
+        else:
+            distance1.loc[f] = DoorWidth * (len(SideDoors1)/2) + DoorSpace * (len(SideDoors1)/2)
+    newpairs1['Distance'] = distance1 * 2
+    newpairs1['c_ij'] = newpairs1['Distance'] / (h*speed)
+    newpairs1 = newpairs1.dropna()
+    travelCost_df1 = newpairs1['c_ij'] * newpairs1['Wgt_y']
+    travelCost1 = travelCost_df1.sum()
+    newpairs2 = newpairs2.reset_index(drop = True)
+    g = 0
+    for g in range(len(newpairs2)):
+        if int(newpairs2.loc[g,'ULDoor']) in EvenDoors and int(newpairs2.loc[g,'LdDoor']) in EvenDoors:
+            x = abs(EvenDoors.index(int(newpairs2.loc[g,'ULDoor'])) - EvenDoors.index(int(newpairs2.loc[g,'LdDoor'])))
+            if x < 1:
+                distance2.loc[g] = 0
+            else:
+               distance2.loc[g] = DoorWidth * x + DoorSpace * x + 2 * Y
+        elif int(newpairs2.loc[g,'ULDoor']) in OddDoors and int(newpairs2.loc[g,'LdDoor']) in OddDoors:
+            x = abs(OddDoors.index(int(newpairs2.loc[g,'ULDoor'])) - OddDoors.index(int(newpairs2.loc[g,'LdDoor'])))
+            if x < 1:
+                distance2.loc[g] = 0
+            else:
+                distance2.loc[g] = DoorWidth * x + DoorSpace * x + 2 * Y
+        elif int(newpairs2.loc[g,'ULDoor']) in SideDoors and int(newpairs2.loc[g,'LdDoor']) in SideDoors:
+            distance2.loc[g] = None
+        elif int(newpairs2.loc[g,'ULDoor']) in OddDoors and int(newpairs2.loc[g,'LdDoor']) in EvenDoors:
+            x = abs(OddDoors.index(int(newpairs2.loc[g,'ULDoor'])) - EvenDoors.index(int(newpairs2.loc[g,'LdDoor'])))
+            distance2.loc[g] = DoorWidth * (x + 1) + DoorSpace * (x + 1) + DockWidth
+        elif int(newpairs2.loc[g,'ULDoor']) in EvenDoors and int(newpairs2.loc[g,'LdDoor']) in OddDoors:
+            x = abs(EvenDoors.index(int(newpairs2.loc[g,'ULDoor'])) - OddDoors.index(int(newpairs2.loc[g,'LdDoor'])))
+            distance2.loc[g] = DoorWidth * (x + 1) + DoorSpace * (x + 1) + DockWidth
+        else:
+            distance2.loc[g] = DoorWidth * (len(SideDoors1)/2) + DoorSpace * (len(SideDoors1)/2)
+    newpairs2['Distance'] = distance2 * 2
+    newpairs2['c_ij'] = newpairs2['Distance'] / (h*speed)
+    newpairs2 = newpairs2.dropna()
+    travelCost_df2 = newpairs2['c_ij'] * newpairs2['Wgt_y']
+    travelCost2 = travelCost_df2.sum()
+    newpairs3 = newpairs3.reset_index(drop = True)
+    d = 0
+    for d in range(len(newpairs3)): 
+        if int(newpairs3.loc[d,'ULDoor']) in EvenDoors and int(newpairs3.loc[d,'LdDoor']) in EvenDoors:
+            x = abs(EvenDoors.index(int(newpairs3.loc[d,'ULDoor'])) - EvenDoors.index(int(newpairs3.loc[d,'LdDoor'])))
+            if x < 1:
+                distance3.loc[d] = 0
+            else:
+               distance3.loc[d] = DoorWidth * x + DoorSpace * x + 2 * Y
+        elif int(newpairs3.loc[d,'ULDoor']) in OddDoors and int(newpairs3.loc[d,'LdDoor']) in OddDoors:
+            x = abs(OddDoors.index(int(newpairs3.loc[d,'ULDoor'])) - OddDoors.index(int(newpairs3.loc[d,'LdDoor'])))
+            if x < 1:
+                distance3.loc[d] = 0
+            else:
+                distance3.loc[d] = DoorWidth * x + DoorSpace * x + 2 * Y
+        elif int(newpairs3.loc[d,'ULDoor']) in SideDoors and int(newpairs3.loc[d,'LdDoor']) in SideDoors:
+            distance3.loc[d] = None
+        elif int(newpairs3.loc[d,'ULDoor']) in OddDoors and int(newpairs3.loc[d,'LdDoor']) in EvenDoors:
+            x = abs(OddDoors.index(int(newpairs3.loc[d,'ULDoor'])) - EvenDoors.index(int(newpairs3.loc[d,'LdDoor'])))
+            distance3.loc[d] = DoorWidth * (x + 1) + DoorSpace * (x + 1) + DockWidth
+        elif int(newpairs3.loc[d,'ULDoor']) in EvenDoors and int(newpairs3.loc[d,'LdDoor']) in OddDoors:
+            x = abs(EvenDoors.index(int(newpairs3.loc[d,'ULDoor'])) - OddDoors.index(int(newpairs3.loc[d,'LdDoor'])))
+            distance3.loc[d] = DoorWidth * (x + 1) + DoorSpace * (x + 1) + DockWidth
+        else:
+            distance3.loc[d] = DoorWidth * (len(SideDoors1)/2) + DoorSpace * (len(SideDoors1)/2)
+    newpairs3['Distance'] = distance3 * 2
+    newpairs3['c_ij'] = newpairs3['Distance'] / (h*speed)
+    newpairs3 = newpairs3.dropna()    
+    travelCost_df3 = newpairs3['c_ij'] * newpairs3['Wgt_y']
+    travelCost3 = travelCost_df3.sum()
+    if travelCost1 == min(travelCost1, travelCost2, travelCost3):
+        newpairs1 = newpairs1
+        newpairs2 = newpairs1
+        newpairs3 = newpairs1
+    elif travelCost2 == min(travelCost1, travelCost2, travelCost3):
+        newpairs1 = newpairs2
+        newpairs2 = newpairs2
+        newpairs3 = newpairs2
+    else:
+        newpairs1 = newpairs3
+        newpairs2 = newpairs3
+        newpairs3 = newpairs3
+    count2 = count2 + 1
+print 'Current Layout Cost:', labor_cost_travel, 'hours'
+print 'New Layout Cost:', min(travelCost1, travelCost2, travelCost3), 'hours'
+
+
+## Below starts the code to get local_optimal layout that was determined by pairwise exchange
+local_optimal = newpairs1.copy()
+local_optimal.ULDoor[local_optimal.ULDoor > 1e5] = (local_optimal.ULDoor[local_optimal.ULDoor > 1e5]/(1e5)).astype(int)
+local_optimal.LdDoor[local_optimal.LdDoor > 1e5] = (local_optimal.LdDoor[local_optimal.LdDoor > 1e5]/(1e5)).astype(int)
+
+local_optimal.LdDoor = local_optimal.LdDoor.drop_duplicates()
+local_optimal = local_optimal.dropna()
+local_optimal.LdDoor = local_optimal.LdDoor.astype(int)
+Door_Assignments = local_optimal.filter(['ULDoor','LdDoor','LoadTo'])
+print Door_Assignments
+
